@@ -34,6 +34,12 @@ import random
 class StrategyLearner(object):  		   	  			  	 		  		  		    	 		 		   		 		  
   		   	  			  	 		  		  		    	 		 		   		 		  
     # constructor  		   	  			  	 		  		  		    	 		 		   		 		  
+    
+    def author(self):
+        
+        
+        return 'nwatt3'
+    
     def __init__(self, verbose = False, impact=0.0):  		   	  			  	 		  		  		    	 		 		   		 		  
         self.verbose = verbose  		   	  			  	 		  		  		    	 		 		   		 		  
         self.impact = impact  		   	  			  	 		  		  		    	 		 		   		 		  
