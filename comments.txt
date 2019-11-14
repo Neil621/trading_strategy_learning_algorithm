@@ -1,41 +1,27 @@
 <pre>--- Summary ---
-Tests passed: 0 out of 4
+Tests passed: 3 out of 4
 
 --- Details ---
-Test #0: failed 
-Test case description: ML4T-220
-Traceback:
-  File "grade_strategy_learner.py", line 142, in test_strategy
-    in_trades_1, in_trades_2, out_trades, train_t, test_t, out_test_t = run_with_timeout(timeoutwrapper_strategylearner,max_time,(),{})
-  File "grading.py", line 133, in run_with_timeout
-    raise e
-NameError: name 'syms' is not defined
-
-Test #1: failed 
-Test case description: AAPL
-Traceback:
-  File "grade_strategy_learner.py", line 142, in test_strategy
-    in_trades_1, in_trades_2, out_trades, train_t, test_t, out_test_t = run_with_timeout(timeoutwrapper_strategylearner,max_time,(),{})
-  File "grading.py", line 133, in run_with_timeout
-    raise e
-NameError: name 'syms' is not defined
-
+Test #0: passed 
+Test #1: passed 
 Test #2: failed 
 Test case description: SINE_FAST_NOISE
 Traceback:
-  File "grade_strategy_learner.py", line 142, in test_strategy
-    in_trades_1, in_trades_2, out_trades, train_t, test_t, out_test_t = run_with_timeout(timeoutwrapper_strategylearner,max_time,(),{})
-  File "grading.py", line 133, in run_with_timeout
-    raise e
-NameError: name 'syms' is not defined
+  File "grade_strategy_learner.py", line 248, in test_strategy
+    raise IncorrectOutput("Test failed on one or more output criteria.\n  Inputs:\n{}\n  Failures:\n{}".format(inputs_str, "\n".join(msgs)))
+IncorrectOutput: Test failed on one or more output criteria.
+  Inputs:
+    insample_args: {'symbol': 'SINE_FAST_NOISE', 'sd': datetime.datetime(2008, 1, 1, 0, 0), 'ed': datetime.datetime(2009, 12, 31, 0, 0), 'sv': 100000}
+    outsample_args: {'symbol': 'SINE_FAST_NOISE', 'sd': datetime.datetime(2010, 1, 1, 0, 0), 'ed': datetime.datetime(2011, 12, 31, 0, 0), 'sv': 100000}
+    benchmark_type: noisy
+    benchmark: 2.0
+    train_time: 25
+    test_time: 5
+    max_time: 60
+    seed: 1481090000
 
-Test #3: failed 
-Test case description: UNH - In sample
-Traceback:
-  File "grade_strategy_learner.py", line 142, in test_strategy
-    in_trades_1, in_trades_2, out_trades, train_t, test_t, out_test_t = run_with_timeout(timeoutwrapper_strategylearner,max_time,(),{})
-  File "grading.py", line 133, in run_with_timeout
-    raise e
-NameError: name 'syms' is not defined
+  Failures:
+  in-sample return (0.6167630338080023) did not beat benchmark (2.0)
 
+Test #3: passed 
 </pre>
