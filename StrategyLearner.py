@@ -29,7 +29,8 @@ GT ID: 903476861 (replace with your GT ID)
 import datetime as dt  		   	  			  	 		  		  		    	 		 		   		 
 import pandas as pd  		   	  			  	 		  		  		    	 		 		   		 
 import util as ut  		   	  			  	 		  		  		    	 		 		   		 	
-import random  		   	  			  	 		  		  		    	 		 		   		 		  
+import random  
+import numpy as np
 
 import BagLearner as bl
 #import QLearner as ql
@@ -59,11 +60,11 @@ class StrategyLearner(object):
     # this method should create a QLearner, and train it for trading  		   	  			  	 		  		  		    	 		 		   		 		  
     def addEvidence(self, symbol = "IBM", \
         sd=dt.datetime(2008,1,1), \
-        ed=dt.datetime(2009,1,1), \
-        sv = 10000):  		   	  			  	 		  		  		    	 		 		   		 		  
+        ed=dt.datetime(2009,1,1),sv = 10000):  		   	  			  	 		  		  		    	 		 		   		 		  
   		   	  			  	 		  		  		    	 		 		   		 		  
-        # add your code to do learning here  		   	  			  	 		  		  		    	 		 		   		 		  
-  		window_size=self.window_size
+        # add your code to do learning here  		   	  			  	 		  		  		    	 
+        
+        window_size=self.window_size
         feature_size = self.feature_size
         N = self.N
         impact=self.impact
@@ -130,20 +131,63 @@ class StrategyLearner(object):
         sd=dt.datetime(2009,1,1), \
         ed=dt.datetime(2010,1,1), \
         sv = 10000):  		   	  			  	 		  		  		    	 		 		   		 		  
+        current_holding=0
   		   	  			  	 		  		  		    	 		 		   		 		  
         # here we build a fake set of trades  		   	  			  	 		  		  		    	 		 		   		 		  
         # your code should return the same sort of data  		   	  			  	 		  		  		    	 		 		   		 		  
-        dates = pd.date_range(sd, ed)  		   	  			  	 		  		  		    	 		 		   		 		  
-        prices_all = ut.get_data([symbol], dates)  # automatically adds SPY  		   	  			  	 		  		  		    	 		 		   		 		  
-        trades = prices_all[[symbol,]]  # only portfolio symbols  		   	  			  	 		  		  		    	 		 		   		 		  
-        trades_SPY = prices_all['SPY']  # only SPY, for comparison later  		   	  			  	 		  		  		    	 		 		   		 		  
-        trades.values[:,:] = 0 # set them all to nothing  		   	  			  	 		  		  		    	 		 		   		 		  
-        trades.values[0,:] = 1000 # add a BUY at the start  		   	  			  	 		  		  		    	 		 		   		 		  
-        trades.values[40,:] = -1000 # add a SELL  		   	  			  	 		  		  		    	 		 		   		 		  
-        trades.values[41,:] = 1000 # add a BUY  		   	  			  	 		  		  		    	 		 		   		 		  
-        trades.values[60,:] = -2000 # go short from long  		   	  			  	 		  		  		    	 		 		   		 		  
-        trades.values[61,:] = 2000 # go long from short  		   	  			  	 		  		  		    	 		 		   		 		  
-        trades.values[-1,:] = -1000 #exit on the last day  		   	  			  	 		  		  		    	 		 		   		 		  
+        dates = pd.date_range(sd, ed)  		   	  			  	 		  		  		    	 		 
+        prices_all = ut.get_data([symbol], dates)  # automatically adds SPY  		   	  			  	 
+        trades = prices_all[[symbol,]]  # only portfolio symbols  		   	  			  	 		  	
+        trades_SPY = prices_all['SPY']  # only SPY, for comparison later  		   	  			  	 	 
+        prices = prices_all[syms]  # only portfolio symbols
+        norm_prices=prices.divide(prices.ix[0])
+        
+        
+        #trades.values[:,:] = 0 # set them all to nothing  		   	  			  	 		  		  	
+        #trades.values[0,:] = 1000 # add a BUY at the start  		   	  			  	 		  		 
+        #trades.values[40,:] = -1000 # add a SELL  		   	  			  	 		  		  		     
+        #trades.values[41,:] = 1000 # add a BUY  		   	  			  	 		  		  		    
+        #trades.values[60,:] = -2000 # go short from long  		   	  			  	 		  		  	
+        #trades.values[61,:] = 2000 # go long from short  		   	  			  	 		  		  	
+        #trades.values[-1,:] = -1000 #exit on the last day  		   	  			  	 		  		  	  
+        
+        # Add My Indicators: SMA,BB,Momentum
+        #1. SMA:
+        smap=norm_prices.copy()
+        smap['SMA/P']=prices.rolling(window_size).mean()/prices
+
+        #2. BB: Bollinger Band Index
+        bb=norm_prices.copy()
+        bb['SMA']=norm_prices.rolling(window_size).mean()
+        bb['STD']=norm_prices.rolling(window_size).std()
+        bb['Upper BB']=bb['SMA']+2.0*bb['STD']
+        bb['Lower BB']=bb['SMA']-2.0*bb['STD']
+        bb['BBI']=(bb.ix[:, 0]-bb['Lower BB'])/(bb['Upper BB']-bb['Lower BB'])
+
+        #3. MM: Momentum
+        MM = norm_prices.copy()
+        MM['Momentum'] = MM.divide(MM.shift(window_size)) - 1
+
+        trades.values[:, :] = 0
+        Xtest = []
+
+        for i in range(window_size + feature_size + 1, len(prices) - N):
+            data = np.concatenate( (smap['SMA/P'][i - feature_size : i], bb['BBI'][i - feature_size : i], MM['Momentum'][i - feature_size : i]) )
+            Xtest.append(data)
+
+        res = self.learner.query(Xtest)
+
+        for i, r in enumerate(res):
+            if r > 0:
+                # Buy signal
+                trades.values[i + window_size + feature_size + 1, :] = 1000 - current_holding
+                current_holding = 1000
+            elif r < 0:
+                # Sell signal
+                trades.values[i + window_size + feature_size + 1, :] = - 1000 - current_holding
+                current_holding = -1000
+
+        
         if self.verbose: print(type(trades)) # it better be a DataFrame!  		   	  			  	 		  		  		    	 		 		   		 		  
         if self.verbose: print(trades)  		   	  			  	 		  		  		    	 		 		   		 		  
         if self.verbose: print(prices_all)  		   	  			  	 		  		  		    	 		 		   		 		  
