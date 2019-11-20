@@ -25,14 +25,23 @@ Student Name: Neil Watt (replace with your name)
 GT User ID: nwatt3 (replace with your User ID)  		   	  			  	 		  		  		    	 		 		   		 		  
 GT ID: 903476861 (replace with your GT ID)  		   	  			  	 		  		  		    	 		 		   		 		  
 """  		   	  			  	 		  		  		    	 		 		   	
+from indicators import get_indicators
+from indicators import cum_return
+from indicators import average_daily_ret
+from indicators import standard_dev_daily_ret
+from indicators import get_simple_moving_average_ratio
 import datetime as dt
 import pandas as pd
 import util as ut
+from util import get_data
 import BagLearner as bl
 #import QLearner as ql
 import DTLearner as dl
 import numpy as np
 import random
+
+
+
 
 class StrategyLearner(object):
 
@@ -50,6 +59,17 @@ class StrategyLearner(object):
     def author(self):
         return 'nwatt'
 
+    def retrieve_price_data(self, symbol, dates):
+         #from util, data file must be located in one directory level up from the active directory
+        data = get_data([symbol], dates)
+        prices = data[symbol]
+        prices /= prices.iloc[0]
+        prices_index = data["SPY"]
+        prices_index /= prices_index.iloc[0]
+        trading_days = prices_index.index
+        return prices, prices_index, trading_days
+    
+    
     # this method should create a QLearner, and train it for trading
     def addEvidence(self, symbol = "IBM", \
         sd=dt.datetime(2008,1,1), \
@@ -71,10 +91,23 @@ class StrategyLearner(object):
         #prices_SPY = prices_all['SPY']  # only SPY, for comparison later
         #if self.verbose: print prices
   
-        # Add My Indicators: SMA,BB,Momentum
-        #1. SMA:
+        
+    
+    
+        #add moving average ratio
+        
+        #get_simple_moving_average_ratio(prices, window=20)
+        
+        #simple_moving_average_ratio['simple_moving_averager'] = get_simple_moving_average_ratio(prices)
+       
+        
+        
         smap=norm_prices.copy()
         smap['SMA/P']=prices.rolling(window_size).mean()/prices
+        
+        
+        
+        
 
         #2. BB: Bollinger Band Index
         bb=norm_prices.copy()
@@ -96,8 +129,11 @@ class StrategyLearner(object):
         X_train=[]
         Y_train=[]
 
+     
+                
+                
         for i in range(window_size + feature_size + 1, len(prices) - N):
-            X_train.append( np.concatenate( (smap['SMA/P'][i - feature_size : i], bb['BBI'][i - feature_size : i], MM['Momentum'][i - feature_size : i]) ) )
+            X_train.append( np.concatenate( (['SMA/P'][i - feature_size : i], bb['BBI'][i - feature_size : i], MM['Momentum'][i - feature_size : i]) ) )
             ret= (prices.values[i + N] - prices.values[i]) / prices.values[i]
             #Cal. N days return
             if ret > threshold:
@@ -105,7 +141,7 @@ class StrategyLearner(object):
             elif ret < -threshold:
                 Y_train.append(-1)
             else:
-                Y_train.append(0)
+                Y_train.append(0)        
 
         X_train=np.array(X_train)
         Y_train=np.array(Y_train)
@@ -138,6 +174,15 @@ class StrategyLearner(object):
 
         # Add My Indicators: SMA,BB,Momentum
         #1. SMA:
+        
+        prices, index_prices, trading_days = self.retrieve_price_data(symbol, pd.date_range(sd, ed))
+        
+        indicators = get_indicators(prices.to_frame(symbol))
+        
+        boll_bandr = indicators["boll_bandr"]
+        simple_moving_averager = indicators["simple_moving_averager"]
+        stdev_divergence=indicators["stdev_divergence"]
+        
         smap=norm_prices.copy()
         smap['SMA/P']=prices.rolling(window_size).mean()/prices
 
@@ -157,7 +202,7 @@ class StrategyLearner(object):
         Xtest = []
 
         for i in range(window_size + feature_size + 1, len(prices) - N):
-            data = np.concatenate( (smap['SMA/P'][i - feature_size : i], bb['BBI'][i - feature_size : i], MM['Momentum'][i - feature_size : i]) )
+            data = np.concatenate( ( ['SMA/P'][i - feature_size : i], bb['BBI'][i - feature_size : i], MM['Momentum'][i - feature_size : i]) )
             Xtest.append(data)
 
         res = self.learner.query(Xtest)
