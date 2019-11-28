@@ -41,7 +41,15 @@ import numpy as np
 import random
 
 
+def get_simple_moving_average(prices, window=20):
+    return prices.rolling(window=window, min_periods=window).mean()
 
+
+def get_stdev(prices, window=20, window_mean=40):
+    stdev=prices.rolling(window=window, min_periods=window).std()
+    sd_signal=prices.rolling(window=window_mean, min_periods=window_mean).std()
+    stdev_divergence=stdev - sd_signal
+    return stdev, sd_signal, stdev_divergence
 
 class StrategyLearner(object):
 
@@ -70,6 +78,9 @@ class StrategyLearner(object):
         return prices, prices_index, trading_days
     
     
+    
+    
+    
     # this method should create a QLearner, and train it for trading
     def addEvidence(self, symbol = "IBM", \
         sd=dt.datetime(2008,1,1), \
@@ -92,27 +103,17 @@ class StrategyLearner(object):
         #if self.verbose: print prices
   
         
-    
-    
-        #add moving average ratio
-        
-        #get_simple_moving_average_ratio(prices, window=20)
-        
-        #simple_moving_average_ratio['simple_moving_averager'] = get_simple_moving_average_ratio(prices)
-       
-        
-        
-        smap=norm_prices.copy()
-        smap['SMA/P']=prices.rolling(window_size).mean()/prices
-        
-        
-        
-        
 
         #2. BB: Bollinger Band Index
         bb=norm_prices.copy()
-        bb['SMA']=norm_prices.rolling(window_size).mean()
-        bb['STD']=norm_prices.rolling(window_size).std()
+        
+        #bb['SMA']=norm_prices.rolling(window_size).mean()
+        
+        bb['SMA'] =get_simple_moving_average(norm_prices)
+        
+        #bb['STD']=norm_prices.rolling(window_size).std()
+        bb['STD'],bb['stdev_signal'],bb['stdev_divergence']=get_stdev(norm_prices)
+            
         bb['Upper BB']=bb['SMA']+2.0*bb['STD']
         bb['Lower BB']=bb['SMA']-2.0*bb['STD']
         bb['BBI']=(bb.ix[:, 0]-bb['Lower BB'])/(bb['Upper BB']-bb['Lower BB'])
