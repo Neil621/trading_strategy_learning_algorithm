@@ -51,6 +51,10 @@ def get_stdev(prices, window=20, window_mean=40):
     stdev_divergence=stdev - sd_signal
     return stdev, sd_signal, stdev_divergence
 
+
+def get_boll_band_ratio(prices, simple_moving_average, stdev):
+    return (prices - (simple_moving_average- 2 * stdev)) / (4 * stdev)
+
 class StrategyLearner(object):
 
     # constructor
@@ -65,7 +69,7 @@ class StrategyLearner(object):
         self.learner=bl.BagLearner(learner=dl.DTLearner, bags=bag, kwargs={"leaf_size":leaf_size})
 
     def author(self):
-        return 'nwatt'
+        return 'nwatt3'
 
     def retrieve_price_data(self, symbol, dates):
          #from util, data file must be located in one directory level up from the active directory
@@ -112,6 +116,7 @@ class StrategyLearner(object):
         bb['SMA'] =get_simple_moving_average(norm_prices)
         
         #bb['STD']=norm_prices.rolling(window_size).std()
+        #note the signal and divergence are NEW
         bb['STD'],bb['stdev_signal'],bb['stdev_divergence']=get_stdev(norm_prices)
             
         bb['Upper BB']=bb['SMA']+2.0*bb['STD']
@@ -119,9 +124,17 @@ class StrategyLearner(object):
         bb['BBI']=(bb.ix[:, 0]-bb['Lower BB'])/(bb['Upper BB']-bb['Lower BB'])
 
         #3. MM: Momentum
-        MM = norm_prices.copy()
-        MM['Momentum'] = MM.divide(MM.shift(window_size)) - 1
+        # replacinge Momentum with STANDARD DEVIATION RATIO
+        
+        
+        #MM = norm_prices.copy()
+        #MM['Momentum'] = MM.divide(MM.shift(window_size)) - 1
 
+        
+        ST=norm_prices.copy()
+        ST['stdev'], ST['stdev_signal'], ST['stdev_divergence']=get_stdev(prices)
+        
+        
         #Normalization
         # smap['SMA/P'] = (smap['SMA/P']-smap['SMA/P'].mean())/smap['SMA/P'].std()
         # bb['BBI'] = (bb['BBI']-bb['BBI'].mean())/bb['BBI'].std()
@@ -134,7 +147,7 @@ class StrategyLearner(object):
                 
                 
         for i in range(window_size + feature_size + 1, len(prices) - N):
-            X_train.append( np.concatenate( (['SMA/P'][i - feature_size : i], bb['BBI'][i - feature_size : i], MM['Momentum'][i - feature_size : i]) ) )
+            X_train.append( np.concatenate( (['SMA/P'][i - feature_size : i], bb['BBI'][i - feature_size : i], ST['stdev_divergence'][i - feature_size : i]) ) )
             ret= (prices.values[i + N] - prices.values[i]) / prices.values[i]
             #Cal. N days return
             if ret > threshold:
@@ -196,14 +209,22 @@ class StrategyLearner(object):
         bb['BBI']=(bb.ix[:, 0]-bb['Lower BB'])/(bb['Upper BB']-bb['Lower BB'])
 
         #3. MM: Momentum
-        MM = norm_prices.copy()
-        MM['Momentum'] = MM.divide(MM.shift(window_size)) - 1
+        #MM = norm_prices.copy()
+        #MM['Momentum'] = MM.divide(MM.shift(window_size)) - 1
+        
+        
+         #MM = norm_prices.copy()
+        #MM['Momentum'] = MM.divide(MM.shift(window_size)) - 1
+
+        
+        ST=norm_prices.copy()
+        ST['stdev'], ST['stdev_signal'], ST['stdev_divergence']=get_stdev(prices)
 
         trades.values[:, :] = 0
         Xtest = []
 
         for i in range(window_size + feature_size + 1, len(prices) - N):
-            data = np.concatenate( ( ['SMA/P'][i - feature_size : i], bb['BBI'][i - feature_size : i], MM['Momentum'][i - feature_size : i]) )
+            data = np.concatenate( ( ['SMA/P'][i - feature_size : i], bb['BBI'][i - feature_size : i], ST['stdev_divergence'][i - feature_size : i]) )
             Xtest.append(data)
 
         res = self.learner.query(Xtest)
