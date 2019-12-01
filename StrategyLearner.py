@@ -109,7 +109,7 @@ class StrategyLearner(object):
         
         boll_bandr = indicators["boll_bandr"]
         simple_moving_averager = indicators["simple_moving_averager"]
-        stdev_divergence=indicators["stdev"]
+        stdev_divergence=indicators["stdev_divergence"]
 
         # Discretize
         ## MACD
@@ -127,7 +127,7 @@ class StrategyLearner(object):
 
         # Compute states of in-sample data
         discretized_indicators = pd.DataFrame(index=indicators.index)
-        discretized_indicators["stdev"] = stdev_divergence_ind.values
+        discretized_indicators["stdev_divergence"] = stdev_divergence_ind.values
         discretized_indicators["boll_bandr"] = boll_bandr_ind.values
         discretized_indicators["simple_moving_averager"] = simple_moving_averager_ind.values
         discretized_indicators["mapping"] = stdev_divergence_ind.astype(str) + boll_bandr_ind.astype(str) + simple_moving_averager_ind.astype(str)
@@ -206,7 +206,7 @@ class StrategyLearner(object):
         #simple_moving_averager = std_indicators["simple_moving_averager"]
         
         std_indicators = self.normalize_indicators(indicators, self.mean, self.std)
-        stdev_divergence = indicators["stdev"]
+        stdev_divergence = indicators["stdev_divergence"]
         boll_bandr = indicators["boll_bandr"]
         simple_moving_averager = indicators["simple_moving_averager"]
 
@@ -223,7 +223,7 @@ class StrategyLearner(object):
 
         # Compute states of out-of-sample data
         discretized_indicators = pd.DataFrame(index=indicators.index)
-        discretized_indicators["stdev"] = stdev_divergence_ind.values
+        discretized_indicators["stdev_divergence"] = stdev_divergence_ind.values
         discretized_indicators["boll_bandr"] = boll_bandr_ind.values
         discretized_indicators["simple_moving_averager"] = simple_moving_averager_ind.values
         discretized_indicators["mapping"] = stdev_divergence_ind.astype(str) + boll_bandr_ind.astype(str) + simple_moving_averager_ind.astype(str)
