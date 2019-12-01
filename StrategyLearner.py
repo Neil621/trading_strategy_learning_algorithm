@@ -34,7 +34,7 @@ import pandas as pd
 from util import get_data
 from indicators import get_daily_returns
 from indicators import get_indicators
-from indicators import cumulative_return
+from indicators import cum_return
 from marketsimcode import compute_portvals
 import QLearner as ql
 
@@ -61,7 +61,7 @@ class StrategyLearner(object):
             np.random.seed(903430342)
 
     def author(self):
-        return "smarchienne3"
+        return "nwatt3"
 
     def get_historical_data(self, symbol, dates):
         data = get_data([symbol], dates)
@@ -287,18 +287,18 @@ def test_code():
         portvals_train = compute_portvals(df_trades, start_val=sv, commission=commission, impact=impact)
         portvals_train /= portvals_train.iloc[0, :]
         
-        if cumulative_return(portvals_train) > 1.0:
-            print("cumulative return in-sample greater than 1.0: {}".format(cumulative_return(portvals_train)))
+        if cum_return(portvals_train) > 1.0:
+            print("cumulative return in-sample greater than 1.0: {}".format(cum_return(portvals_train)))
         else:
-            print("ERROR cumulative return in-sample NOT greater than 1.0: {}".format(cumulative_return(portvals_train)))
+            print("ERROR cumulative return in-sample NOT greater than 1.0: {}".format(cum_return(portvals_train)))
 
-        if cumulative_return(portvals_train) > cumulative_return(benchmark):
+        if cum_return(portvals_train) > cum_return(benchmark):
             print("cumulative return in-sample greater than benchmark: {} vs {}".format(
-                cumulative_return(portvals_train), cumulative_return(benchmark))
+                cum_return(portvals_train), cum_return(benchmark))
             )
         else:
             print("ERROR cumulative return in-sample NOT greater than benchmark: {} vs {}".format(
-                cumulative_return(portvals_train), cumulative_return(benchmark)
+                cum_return(portvals_train), cum_return(benchmark)
             ))
 
         fig, ax = plt.subplots()
@@ -339,18 +339,18 @@ def test_code():
         portvals_test = compute_portvals(df_trades, start_val=sv, commission=commission, impact=impact)
         portvals_test /= portvals_test.iloc[0, :]
 
-        if cumulative_return(portvals_test) > 1.0:
-            print("cumulative return out-of-sample greater than 1.0: {}".format(cumulative_return(portvals_test)))
+        if cum_return(portvals_test) > 1.0:
+            print("cumulative return out-of-sample greater than 1.0: {}".format(cum_return(portvals_test)))
         else:
-            print("ERROR cumulative return out-of-sample NOT greater than 1.0: {}".format(cumulative_return(portvals_test)))
+            print("ERROR cumulative return out-of-sample NOT greater than 1.0: {}".format(cum_return(portvals_test)))
 
-        if cumulative_return(portvals_test) > cumulative_return(benchmark):
+        if cum_return(portvals_test) > cum_return(benchmark):
             print("cumulative return out-of-sample greater than benchmark: {} vs {}".format(
-                cumulative_return(portvals_test), cumulative_return(benchmark)
+                cum_return(portvals_test), cum_return(benchmark)
             ))
         else:
             print("ERROR cumulative return out-of-sample NOT greater than benchmark: {} vs {}".format(
-                cumulative_return(portvals_test), cumulative_return(benchmark)
+                cum_return(portvals_test), cum_return(benchmark)
             ))
 
         fig, ax = plt.subplots()
