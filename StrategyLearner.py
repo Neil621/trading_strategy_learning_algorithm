@@ -32,11 +32,16 @@ from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
 from util import get_data
-from indicators import get_daily_returns
 from indicators import get_indicators
+from indicators import get_daily_returns
 from indicators import cum_return
 from marketsimcode import compute_portvals
+
+
+
 import QLearner as ql
+
+
 
 
 class StrategyLearner(object):
@@ -49,9 +54,9 @@ class StrategyLearner(object):
         self.num_states = self.n_bins ** 3
         self.mean = None
         self.std = None
-        self.divergence_bins = None
-        self.bbr_bins = None
-        self.SMAr_bins = None
+        self.stdev_divergence_bins = None
+        self.boll_bandr_bins = None
+        self.simple_moving_averager_bins = None
         self.min_iter = min_iter
         self.max_iter = max_iter
         self.seed = seed
@@ -96,30 +101,36 @@ class StrategyLearner(object):
         if (self.std == 0).any():
             self.std = 1
         std_indicators = self.normalize_indicators(indicators, self.mean, self.std)
-        divergence = std_indicators["divergence"]
-        bbr = std_indicators["bbr"]
-        SMAr = std_indicators["SMAr"]
+        #stdev_divergence = std_indicators["stdev_divergence"]
+        #boll_bandr = std_indicators["boll_bandr"]
+        #simple_moving_averager = std_indicators["simple_moving_averager"]
+        
+        
+        
+        boll_bandr = indicators["boll_bandr"]
+        simple_moving_averager = indicators["simple_moving_averager"]
+        stdev_divergence=indicators["stdev"]
 
         # Discretize
         ## MACD
-        _, self.divergence_bins = pd.qcut(divergence, self.n_bins, retbins=True, labels=False)
-        divergence_ind = self.discretize(divergence, self.divergence_bins, self.n_bins)
-        divergence_ind = pd.Series(divergence_ind, index=indicators.index)
+        _, self.stdev_divergence_bins = pd.qcut(stdev_divergence, self.n_bins, retbins=True, labels=False)
+        stdev_divergence_ind = self.discretize(stdev_divergence, self.stdev_divergence_bins, self.n_bins)
+        stdev_divergence_ind = pd.Series(stdev_divergence_ind, index=indicators.index)
         ## Bollinger Bands
-        _, self.bbr_bins = pd.qcut(bbr, self.n_bins, retbins=True, labels=False)
-        bbr_ind = self.discretize(bbr, self.bbr_bins, self.n_bins)
-        bbr_ind = pd.Series(bbr_ind, index=indicators.index)
+        _, self.boll_bandr_bins = pd.qcut(boll_bandr, self.n_bins, retbins=True, labels=False)
+        boll_bandr_ind = self.discretize(boll_bandr, self.boll_bandr_bins, self.n_bins)
+        boll_bandr_ind = pd.Series(boll_bandr_ind, index=indicators.index)
         ## SMA
-        _, self.SMAr_bins = pd.qcut(SMAr, self.n_bins, retbins=True, labels=False)
-        SMAr_ind = self.discretize(SMAr, self.SMAr_bins, self.n_bins)
-        SMAr_ind = pd.Series(SMAr_ind, index=indicators.index)
+        _, self.simple_moving_averager_bins = pd.qcut(simple_moving_averager, self.n_bins, retbins=True, labels=False)
+        simple_moving_averager_ind = self.discretize(simple_moving_averager, self.simple_moving_averager_bins, self.n_bins)
+        simple_moving_averager_ind = pd.Series(simple_moving_averager_ind, index=indicators.index)
 
         # Compute states of in-sample data
         discretized_indicators = pd.DataFrame(index=indicators.index)
-        discretized_indicators["divergence"] = divergence_ind.values
-        discretized_indicators["bbr"] = bbr_ind.values
-        discretized_indicators["SMAr"] = SMAr_ind.values
-        discretized_indicators["mapping"] = divergence_ind.astype(str) + bbr_ind.astype(str) + SMAr_ind.astype(str)
+        discretized_indicators["stdev"] = stdev_divergence_ind.values
+        discretized_indicators["boll_bandr"] = boll_bandr_ind.values
+        discretized_indicators["simple_moving_averager"] = simple_moving_averager_ind.values
+        discretized_indicators["mapping"] = stdev_divergence_ind.astype(str) + boll_bandr_ind.astype(str) + simple_moving_averager_ind.astype(str)
         discretized_indicators["state"] = discretized_indicators["mapping"].astype(np.int)
         states = discretized_indicators["state"]
 
@@ -189,28 +200,33 @@ class StrategyLearner(object):
 
         # Indicators
         indicators = get_indicators(prices.to_frame(symbol))
+        #std_indicators = self.normalize_indicators(indicators, self.mean, self.std)
+        #stdev_divergence = std_indicators["stdev"]
+        #boll_bandr = std_indicators["boll_bandr"]
+        #simple_moving_averager = std_indicators["simple_moving_averager"]
+        
         std_indicators = self.normalize_indicators(indicators, self.mean, self.std)
-        divergence = std_indicators["divergence"]
-        bbr = std_indicators["bbr"]
-        SMAr = std_indicators["SMAr"]
+        stdev_divergence = indicators["stdev"]
+        boll_bandr = indicators["boll_bandr"]
+        simple_moving_averager = indicators["simple_moving_averager"]
 
         # Discretize
         ## MACD
-        divergence_ind = self.discretize(divergence, self.divergence_bins, self.n_bins)
-        divergence_ind = pd.Series(divergence_ind, index=indicators.index)
+        stdev_divergence_ind = self.discretize(stdev_divergence, self.stdev_divergence_bins, self.n_bins)
+        stdev_divergence_ind = pd.Series(stdev_divergence_ind, index=indicators.index)
         ## Bollinger Bands
-        bbr_ind = self.discretize(bbr, self.bbr_bins, self.n_bins)
-        bbr_ind = pd.Series(bbr_ind, index=indicators.index)
+        boll_bandr_ind = self.discretize(boll_bandr, self.boll_bandr_bins, self.n_bins)
+        boll_bandr_ind = pd.Series(boll_bandr_ind, index=indicators.index)
         ## SMA
-        SMAr_ind = self.discretize(SMAr, self.SMAr_bins, self.n_bins)
-        SMAr_ind = pd.Series(SMAr_ind, index=indicators.index)
+        simple_moving_averager_ind = self.discretize(simple_moving_averager, self.simple_moving_averager_bins, self.n_bins)
+        simple_moving_averager_ind = pd.Series(simple_moving_averager_ind, index=indicators.index)
 
         # Compute states of out-of-sample data
         discretized_indicators = pd.DataFrame(index=indicators.index)
-        discretized_indicators["divergence"] = divergence_ind.values
-        discretized_indicators["bbr"] = bbr_ind.values
-        discretized_indicators["SMAr"] = SMAr_ind.values
-        discretized_indicators["mapping"] = divergence_ind.astype(str) + bbr_ind.astype(str) + SMAr_ind.astype(str)
+        discretized_indicators["stdev"] = stdev_divergence_ind.values
+        discretized_indicators["boll_bandr"] = boll_bandr_ind.values
+        discretized_indicators["simple_moving_averager"] = simple_moving_averager_ind.values
+        discretized_indicators["mapping"] = stdev_divergence_ind.astype(str) + boll_bandr_ind.astype(str) + simple_moving_averager_ind.astype(str)
         discretized_indicators["state"] = discretized_indicators["mapping"].astype(np.int)
         states = discretized_indicators["state"]
 
