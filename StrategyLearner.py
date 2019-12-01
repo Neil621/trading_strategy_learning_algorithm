@@ -1,5 +1,5 @@
 """  		   	  			  	 		  		  		    	 		 		   		 		  
-Template for implementing StrategyLearner  (c) 2016 Tucker Balch  		   	  			  	 		  		  		    	 		 		   		 		  
+Template for implementing QLearner  (c) 2015 Tucker Balch  		   	  			  	 		  		  		    	 		 		   		 		  
   		   	  			  	 		  		  		    	 		 		   		 		  
 Copyright 2018, Georgia Institute of Technology (Georgia Tech)  		   	  			  	 		  		  		    	 		 		   		 		  
 Atlanta, Georgia 30332  		   	  			  	 		  		  		    	 		 		   		 		  
@@ -21,228 +21,386 @@ GT honor code violation.
   		   	  			  	 		  		  		    	 		 		   		 		  
 -----do not edit anything above this line---  		   	  			  	 		  		  		    	 		 		   		 		  
   		   	  			  	 		  		  		    	 		 		   		 		  
-Student Name: Neil Watt (replace with your name)  		   	  			  	 		  		  		    	 		 		   		 		  
+Student Name: Neil Watt(replace with your name)  		   	  			  	 		  		  		    	 		 		   		 		  
 GT User ID: nwatt3 (replace with your User ID)  		   	  			  	 		  		  		    	 		 		   		 		  
-GT ID: 903476861 (replace with your GT ID)  		   	  			  	 		  		  		    	 		 		   		 		  
-"""  		   	  			  	 		  		  		    	 		 		   	
-from indicators import get_indicators
-from indicators import cum_return
-from indicators import average_daily_ret
-from indicators import standard_dev_daily_ret
-from indicators import get_simple_moving_average_ratio
+GT ID: 903476861  (replace with your GT ID)  		   	  			  	 		  		  		    	 		 		   		 		  
+"""
+import time
 import datetime as dt
-import pandas as pd
-import util as ut
-from util import get_data
-import BagLearner as bl
-#import QLearner as ql
-import DTLearner as dl
+import matplotlib; matplotlib.use('Agg')
+from matplotlib import pyplot as plt
 import numpy as np
-import random
+import pandas as pd
+from util import get_data
+from indicators import get_daily_returns
+from indicators import get_indicators
+from indicators import cumulative_return
+from marketsimcode import compute_portvals
+import QLearner as ql
 
-
-def get_simple_moving_average(prices, window=20):
-    return prices.rolling(window=window, min_periods=window).mean()
-
-
-def get_stdev(prices, window=20, window_mean=40):
-    stdev=prices.rolling(window=window, min_periods=window).std()
-    sd_signal=prices.rolling(window=window_mean, min_periods=window_mean).std()
-    stdev_divergence=stdev - sd_signal
-    return stdev, sd_signal, stdev_divergence
-
-
-def get_boll_band_ratio(prices, simple_moving_average, stdev):
-    return (prices - (simple_moving_average- 2 * stdev)) / (4 * stdev)
 
 class StrategyLearner(object):
 
-    # constructor
-    def __init__(self, verbose = False, impact=0.0):
+    def __init__(self, verbose=False, seed=False, impact=0.0, commission=0.0, min_iter=20, max_iter=100):
         self.verbose = verbose
         self.impact = impact
-        self.window_size=20
-        self.feature_size = 5
-        self.N = 10
-        bag=20
-        leaf_size = 5
-        self.learner=bl.BagLearner(learner=dl.DTLearner, bags=bag, kwargs={"leaf_size":leaf_size})
+        self.commission = commission
+        self.n_bins = 10
+        self.num_states = self.n_bins ** 3
+        self.mean = None
+        self.std = None
+        self.divergence_bins = None
+        self.bbr_bins = None
+        self.SMAr_bins = None
+        self.min_iter = min_iter
+        self.max_iter = max_iter
+        self.seed = seed
+
+        # Seed for charts
+        if seed:
+            np.random.seed(903430342)
 
     def author(self):
-        return 'nwatt3'
+        return "smarchienne3"
 
-    def retrieve_price_data(self, symbol, dates):
-         #from util, data file must be located in one directory level up from the active directory
+    def get_historical_data(self, symbol, dates):
         data = get_data([symbol], dates)
         prices = data[symbol]
         prices /= prices.iloc[0]
-        prices_index = data["SPY"]
-        prices_index /= prices_index.iloc[0]
-        trading_days = prices_index.index
-        return prices, prices_index, trading_days
-    
-    
-    
-    
-    
-    # this method should create a QLearner, and train it for trading
+        index_prices = data["SPY"]
+        index_prices /= index_prices.iloc[0]
+        trading_days = index_prices.index
+        return prices, trading_days
+
+    def discretize(self, X, bins, n_bins):
+        indices = np.digitize(X, bins, right=True) - 1
+        indices = np.clip(indices, 0, n_bins-1)
+        return indices
+
+    def normalize_indicators(self, df, mu, sigma):
+        return (df - mu) / sigma
+
     def addEvidence(self, symbol = "IBM", \
         sd=dt.datetime(2008,1,1), \
         ed=dt.datetime(2009,1,1), \
-        sv = 10000): 
+        sv = 10000):
 
-        # add your code to do learning here
-        window_size=self.window_size
-        feature_size = self.feature_size
-        N = self.N
-        impact=self.impact
-        threshold = max(0.05, 2 * impact)
-        # example usage of the old backward compatible util function
-        syms=[symbol]
-        dates = pd.date_range(sd, ed)
-        prices_all = ut.get_data(syms, dates)  # automatically adds SPY
-        prices = prices_all[syms]  # only portfolio symbols
-        norm_prices=prices.divide(prices.ix[0])
-        #prices_SPY = prices_all['SPY']  # only SPY, for comparison later
-        #if self.verbose: print prices
-  
-        
+        # Grab in-sample data
+        prices, trading_days = self.get_historical_data(symbol, pd.date_range(sd, ed))
+        daily_returns = get_daily_returns(prices)
 
-        #2. BB: Bollinger Band Index
-        bb=norm_prices.copy()
-        
-        #bb['SMA']=norm_prices.rolling(window_size).mean()
-        
-        bb['SMA'] =get_simple_moving_average(norm_prices)
-        
-        #bb['STD']=norm_prices.rolling(window_size).std()
-        #note the signal and divergence are NEW
-        bb['STD'],bb['stdev_signal'],bb['stdev_divergence']=get_stdev(norm_prices)
-            
-        bb['Upper BB']=bb['SMA']+2.0*bb['STD']
-        bb['Lower BB']=bb['SMA']-2.0*bb['STD']
-        bb['BBI']=(bb.ix[:, 0]-bb['Lower BB'])/(bb['Upper BB']-bb['Lower BB'])
+        # Indicators
+        indicators = get_indicators(prices.to_frame(symbol))
+        self.mean = indicators.mean()
+        self.std = indicators.std()
+        if (self.std == 0).any():
+            self.std = 1
+        std_indicators = self.normalize_indicators(indicators, self.mean, self.std)
+        divergence = std_indicators["divergence"]
+        bbr = std_indicators["bbr"]
+        SMAr = std_indicators["SMAr"]
 
-        #3. MM: Momentum
-        # replacinge Momentum with STANDARD DEVIATION RATIO
-        
-        
-        #MM = norm_prices.copy()
-        #MM['Momentum'] = MM.divide(MM.shift(window_size)) - 1
+        # Discretize
+        ## MACD
+        _, self.divergence_bins = pd.qcut(divergence, self.n_bins, retbins=True, labels=False)
+        divergence_ind = self.discretize(divergence, self.divergence_bins, self.n_bins)
+        divergence_ind = pd.Series(divergence_ind, index=indicators.index)
+        ## Bollinger Bands
+        _, self.bbr_bins = pd.qcut(bbr, self.n_bins, retbins=True, labels=False)
+        bbr_ind = self.discretize(bbr, self.bbr_bins, self.n_bins)
+        bbr_ind = pd.Series(bbr_ind, index=indicators.index)
+        ## SMA
+        _, self.SMAr_bins = pd.qcut(SMAr, self.n_bins, retbins=True, labels=False)
+        SMAr_ind = self.discretize(SMAr, self.SMAr_bins, self.n_bins)
+        SMAr_ind = pd.Series(SMAr_ind, index=indicators.index)
 
-        
-        ST=norm_prices.copy()
-        ST['stdev'], ST['stdev_signal'], ST['stdev_divergence']=get_stdev(prices)
-        
-        
-        #Normalization
-        # smap['SMA/P'] = (smap['SMA/P']-smap['SMA/P'].mean())/smap['SMA/P'].std()
-        # bb['BBI'] = (bb['BBI']-bb['BBI'].mean())/bb['BBI'].std()
-        # MM['Momentum'] = (MM['Momentum']-MM['Momentum'].mean())/MM['Momentum'].std()
-        
-        X_train=[]
-        Y_train=[]
+        # Compute states of in-sample data
+        discretized_indicators = pd.DataFrame(index=indicators.index)
+        discretized_indicators["divergence"] = divergence_ind.values
+        discretized_indicators["bbr"] = bbr_ind.values
+        discretized_indicators["SMAr"] = SMAr_ind.values
+        discretized_indicators["mapping"] = divergence_ind.astype(str) + bbr_ind.astype(str) + SMAr_ind.astype(str)
+        discretized_indicators["state"] = discretized_indicators["mapping"].astype(np.int)
+        states = discretized_indicators["state"]
 
-     
-                
-                
-        for i in range(window_size + feature_size + 1, len(prices) - N):
-            X_train.append( np.concatenate( (['SMA/P'][i - feature_size : i], bb['BBI'][i - feature_size : i], ST['stdev_divergence'][i - feature_size : i]) ) )
-            ret= (prices.values[i + N] - prices.values[i]) / prices.values[i]
-            #Cal. N days return
-            if ret > threshold:
-                Y_train.append(1)
-            elif ret < -threshold:
-                Y_train.append(-1)
-            else:
-                Y_train.append(0)        
+        # QLearner
+        self.learner = ql.QLearner(
+            num_states=self.num_states,
+            num_actions=3,
+            alpha=0.2,
+            gamma=0.9,
+            rar=0.5,
+            radr=0.99,
+            dyna=0,
+            verbose=self.verbose,
+            seed=self.seed
+        )
 
-        X_train=np.array(X_train)
-        Y_train=np.array(Y_train)
+        # Training loop
+        i = 0
+        converged = False
+        df_trades_previous = None
+        while (i <= self.min_iter) or (i <= self.max_iter and not converged):
 
-        self.learner.addEvidence(X_train, Y_train)
-    # this method should use the existing policy and test it against new data
+            # Set state with indicators of this first day
+            action = self.learner.querysetstate(states.iloc[0])
+
+            holding = 0
+            df_trades = pd.Series(index=states.index)
+            for day, state in states.iteritems():
+                reward = holding * daily_returns.loc[day]
+                if action != 2: # LONG or SHORT?
+                    reward *= (1 - self.impact)
+                action = self.learner.query(state, reward)
+                if action == 0:  # SHORT
+                    df_trades.loc[day] = {
+                        -1000: 0,
+                        0: -1000,
+                        1000: -2000,
+                    }.get(holding)
+                elif action == 1:  # LONG
+                    df_trades.loc[day] = {
+                        -1000: 2000,
+                        0: 1000,
+                        1000: 0,
+                    }.get(holding)
+                elif action == 2:  # DO NOTHING
+                    df_trades.loc[day] = 0
+                else:
+                    raise Exception("Unknown trading action to take: {}".format(action))
+
+                holding += df_trades.loc[day]
+
+            # Check for convergence
+            if (df_trades_previous is not None) and (df_trades.equals(df_trades_previous)):
+                converged = True
+
+            df_trades_previous = df_trades
+            i += 1
+
+
     def testPolicy(self, symbol = "IBM", \
         sd=dt.datetime(2009,1,1), \
         ed=dt.datetime(2010,1,1), \
         sv = 10000):
 
-        current_holding=0
+        # Grab out-of-sample data
+        prices, trading_days = self.get_historical_data(symbol, pd.date_range(sd, ed))
 
-        # here we build a fake set of trades
-        # your code should return the same sort of data
-        dates = pd.date_range(sd, ed)
-        prices_all = ut.get_data([symbol], dates)  # automatically adds SPY
-        trades = prices_all[[symbol,]]  # only portfolio symbols
-        trades_SPY = prices_all['SPY']  # only SPY, for comparison later
-
-        window_size=self.window_size
-        feature_size = self.feature_size
-        N=self.N
-
-        syms=[symbol]
-        dates = pd.date_range(sd, ed)
-        prices_all = ut.get_data(syms, dates)  # automatically adds SPY
-        prices = prices_all[syms]  # only portfolio symbols
-        norm_prices=prices.divide(prices.ix[0])
-
-        # Add My Indicators: SMA,BB,Momentum
-        #1. SMA:
-        
-        prices, index_prices, trading_days = self.retrieve_price_data(symbol, pd.date_range(sd, ed))
-        
+        # Indicators
         indicators = get_indicators(prices.to_frame(symbol))
+        std_indicators = self.normalize_indicators(indicators, self.mean, self.std)
+        divergence = std_indicators["divergence"]
+        bbr = std_indicators["bbr"]
+        SMAr = std_indicators["SMAr"]
+
+        # Discretize
+        ## MACD
+        divergence_ind = self.discretize(divergence, self.divergence_bins, self.n_bins)
+        divergence_ind = pd.Series(divergence_ind, index=indicators.index)
+        ## Bollinger Bands
+        bbr_ind = self.discretize(bbr, self.bbr_bins, self.n_bins)
+        bbr_ind = pd.Series(bbr_ind, index=indicators.index)
+        ## SMA
+        SMAr_ind = self.discretize(SMAr, self.SMAr_bins, self.n_bins)
+        SMAr_ind = pd.Series(SMAr_ind, index=indicators.index)
+
+        # Compute states of out-of-sample data
+        discretized_indicators = pd.DataFrame(index=indicators.index)
+        discretized_indicators["divergence"] = divergence_ind.values
+        discretized_indicators["bbr"] = bbr_ind.values
+        discretized_indicators["SMAr"] = SMAr_ind.values
+        discretized_indicators["mapping"] = divergence_ind.astype(str) + bbr_ind.astype(str) + SMAr_ind.astype(str)
+        discretized_indicators["state"] = discretized_indicators["mapping"].astype(np.int)
+        states = discretized_indicators["state"]
+
+        holding = 0
+        df_trades = pd.Series(index=states.index)
+        for day, state in states.iteritems():
+            action = self.learner.querysetstate(state, random=False)
+            if action == 0:  # SHORT
+                df_trades.loc[day] = {
+                    -1000: 0,
+                    0: -1000,
+                    1000: -2000,
+                }.get(holding)
+            elif action == 1:  # LONG
+                df_trades.loc[day] = {
+                    -1000: 2000,
+                    0: 1000,
+                    1000: 0,
+                }.get(holding)
+            elif action == 2:  # DO NOTHING
+                df_trades.loc[day] = 0
+            else:
+                raise Exception("Unknown trading action to take: {}".format(action))
+
+            holding += df_trades.loc[day]
+
+        return df_trades.to_frame(symbol)
+
+
+def test_code():
+
+    sv = 100000
+    commission = 0.0
+    impact = 0.0
+    sd_in = dt.datetime(2008, 1, 1)
+    ed_in = dt.datetime(2009, 12, 31)
+    sd_out = dt.datetime(2010, 1, 1)
+    ed_out = dt.datetime(2011, 12, 31)
+    bench = lambda trading_days: [1000] + [0] * (len(trading_days) - 2) + [-1000]
+
+    for symbol in ["JPM", "ML4T-220", "AAPL", "UNH", "SINE_FAST_NOISE"]:
+
+        print("#######################")
+        print("{}".format(symbol))
+        print("#######################")
+
+        ############################
+        #
+        # In sample
+        #
+        ############################
+
+        # In sample
+        period = pd.date_range(sd_in, ed_in)
+        trading_days = get_data(["SPY"], dates=period).index
+
+        # Benchmark in-sample
+        benchmark_trade = pd.DataFrame(bench(trading_days), columns=[symbol], index=trading_days)
+        benchmark = compute_portvals(benchmark_trade, start_val=sv, commission=commission, impact=impact)
+        benchmark /= benchmark.iloc[0, :]
+
+        # Train
+        print("Training...")
+        learner = StrategyLearner(verbose=False, seed=True, impact=impact, commission=commission)
+        start = time.time()
+        learner.addEvidence(symbol=symbol, sd=sd_in, ed=ed_in, sv=sv)
+        print("addEvidence() on in-sample completes in in {}sec".format(time.time()-start))
+
+        # Test : in-sample
+        print("Testing in-sample...")
+        start = time.time()
+        df_trades = learner.testPolicy(symbol=symbol, sd=sd_in, ed=ed_in, sv=sv)
+        print("testPolicy() on in-sample completes in in {}sec".format(time.time() - start))
+        portvals_train = compute_portvals(df_trades, start_val=sv, commission=commission, impact=impact)
+        portvals_train /= portvals_train.iloc[0, :]
         
-        boll_bandr = indicators["boll_bandr"]
-        simple_moving_averager = indicators["simple_moving_averager"]
-        stdev_divergence=indicators["stdev_divergence"]
-        
-        smap=norm_prices.copy()
-        smap['SMA/P']=prices.rolling(window_size).mean()/prices
+        if cumulative_return(portvals_train) > 1.0:
+            print("cumulative return in-sample greater than 1.0: {}".format(cumulative_return(portvals_train)))
+        else:
+            print("ERROR cumulative return in-sample NOT greater than 1.0: {}".format(cumulative_return(portvals_train)))
 
-        #2. BB: Bollinger Band Index
-        bb=norm_prices.copy()
-        bb['SMA']=norm_prices.rolling(window_size).mean()
-        bb['STD']=norm_prices.rolling(window_size).std()
-        bb['Upper BB']=bb['SMA']+2.0*bb['STD']
-        bb['Lower BB']=bb['SMA']-2.0*bb['STD']
-        bb['BBI']=(bb.ix[:, 0]-bb['Lower BB'])/(bb['Upper BB']-bb['Lower BB'])
+        if cumulative_return(portvals_train) > cumulative_return(benchmark):
+            print("cumulative return in-sample greater than benchmark: {} vs {}".format(
+                cumulative_return(portvals_train), cumulative_return(benchmark))
+            )
+        else:
+            print("ERROR cumulative return in-sample NOT greater than benchmark: {} vs {}".format(
+                cumulative_return(portvals_train), cumulative_return(benchmark)
+            ))
 
-        #3. MM: Momentum
-        #MM = norm_prices.copy()
-        #MM['Momentum'] = MM.divide(MM.shift(window_size)) - 1
-        
-        
-         #MM = norm_prices.copy()
-        #MM['Momentum'] = MM.divide(MM.shift(window_size)) - 1
+        fig, ax = plt.subplots()
+        benchmark.plot(ax=ax, color="g")
+        portvals_train.plot(ax=ax, color="r")
+        plt.legend(["Benchmark", "QLearner Strategy"])
+        plt.title("QLearner Strategy on {} stock over in-sample period".format(symbol))
+        plt.xlabel("Dates")
+        plt.ylabel("Normalized value")
+        for day, order in df_trades[df_trades[symbol] != 0].iterrows():
+            if order[symbol] < 0:  # SHORT
+                ax.axvline(day, color="k", alpha=0.5)
+            elif order[symbol] > 0:  # LONG
+                ax.axvline(day, color="b", alpha=0.5)
+        plt.tight_layout()
+        plt.savefig("QLearner_{}_in_sample.png".format(symbol))
 
-        
-        ST=norm_prices.copy()
-        ST['stdev'], ST['stdev_signal'], ST['stdev_divergence']=get_stdev(prices)
+        ############################
+        #
+        # Out of sample
+        #
+        ############################
 
-        trades.values[:, :] = 0
-        Xtest = []
+        # Test : out-of-sample
+        print("Testing out-of-sample...")
+        period = pd.date_range(sd_out, ed_out)
+        trading_days = get_data(["SPY"], dates=period).index
 
-        for i in range(window_size + feature_size + 1, len(prices) - N):
-            data = np.concatenate( ( ['SMA/P'][i - feature_size : i], bb['BBI'][i - feature_size : i], ST['stdev_divergence'][i - feature_size : i]) )
-            Xtest.append(data)
+        # Benchmark out of sample
+        benchmark_trade = pd.DataFrame(bench(trading_days), columns=[symbol], index=trading_days)
+        benchmark = compute_portvals(benchmark_trade, start_val=sv, commission=commission, impact=impact)
+        benchmark /= benchmark.iloc[0, :]
 
-        res = self.learner.query(Xtest)
+        # testPolicy out of sample
+        start = time.time()
+        df_trades = learner.testPolicy(symbol=symbol, sd=sd_out, ed=ed_out, sv=sv)
+        print("testPolicy() on out-of-sample completes in in {}sec".format(time.time() - start))
+        portvals_test = compute_portvals(df_trades, start_val=sv, commission=commission, impact=impact)
+        portvals_test /= portvals_test.iloc[0, :]
 
-        for i, r in enumerate(res):
-            if r > 0:
-                # Buy signal
-                trades.values[i + window_size + feature_size + 1, :] = 1000 - current_holding
-                current_holding = 1000
-            elif r < 0:
-                # Sell signal
-                trades.values[i + window_size + feature_size + 1, :] = - 1000 - current_holding
-                current_holding = -1000
+        if cumulative_return(portvals_test) > 1.0:
+            print("cumulative return out-of-sample greater than 1.0: {}".format(cumulative_return(portvals_test)))
+        else:
+            print("ERROR cumulative return out-of-sample NOT greater than 1.0: {}".format(cumulative_return(portvals_test)))
 
-        if self.verbose: print(type(trades)) # it better be a DataFrame!
-        if self.verbose: print(trades)
-        if self.verbose: print(prices_all)
-        return trades
+        if cumulative_return(portvals_test) > cumulative_return(benchmark):
+            print("cumulative return out-of-sample greater than benchmark: {} vs {}".format(
+                cumulative_return(portvals_test), cumulative_return(benchmark)
+            ))
+        else:
+            print("ERROR cumulative return out-of-sample NOT greater than benchmark: {} vs {}".format(
+                cumulative_return(portvals_test), cumulative_return(benchmark)
+            ))
 
-if __name__=="__main__":
-    print("One does not simply think up a strategy")
+        fig, ax = plt.subplots()
+        benchmark.plot(ax=ax, color="g")
+        portvals_test.plot(ax=ax, color="r")
+        plt.legend(["Benchmark", "QLearner Strategy"])
+        plt.title("QLearner Strategy on {} stock over out-of-sample period".format(symbol))
+        plt.xlabel("Dates")
+        plt.ylabel("Normalized value")
+        for day, order in df_trades[df_trades[symbol] != 0].iterrows():
+            if order[symbol] < 0:  # SHORT
+                ax.axvline(day, color="k", alpha=0.5)
+            elif order[symbol] > 0:  # LONG
+                ax.axvline(day, color="b", alpha=0.5)
+        plt.tight_layout()
+        plt.savefig("QLearner_{}_out_of_sample.png".format(symbol))
+
+
+def tests():
+    import time
+    symbol = "JPM"
+    sd_in = dt.datetime(2008, 1, 1)
+    ed_in = dt.datetime(2009, 12, 31)
+    sv = 10000
+
+    # Make sure testPolicy() always return the same result
+    learner = StrategyLearner(verbose=False, seed=False)
+    learner.addEvidence(symbol=symbol, sd=sd_in, ed=ed_in, sv=sv)
+    df_trades_previous = None
+    for i in range(20):
+        df_trades = learner.testPolicy(symbol=symbol, sd=sd_in, ed=ed_in, sv=sv)
+        if (df_trades_previous is not None) and not (df_trades_previous.equals(df_trades)):
+            raise Exception("testPolicy() does not always return the same result")
+    print("OK: testPolicy() always returns the same result")
+
+    # testPolicy() method should be much faster than your addEvidence() method
+    learner = StrategyLearner(verbose=False, seed=False)
+    start = time.time()
+    learner.addEvidence(symbol=symbol, sd=sd_in, ed=ed_in, sv=sv)
+    time_addEvidence = time.time() - start
+
+    start = time.time()
+    learner.testPolicy(symbol=symbol, sd=sd_in, ed=ed_in, sv=sv)
+    time_testPolicy = time.time() - start
+
+    if time_testPolicy >= time_addEvidence:
+        print("testPolicy() is not faster than addEvidence()!!! {} VS {}".format(time_testPolicy, time_addEvidence))
+    print("OK: testPolicy() faster than addEvidence(): {} VS {}".format(time_testPolicy, time_addEvidence))
+
+
+if __name__ == "__main__":
+    test_code()
+    #tests()
