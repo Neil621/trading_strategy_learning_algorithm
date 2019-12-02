@@ -63,7 +63,7 @@ class StrategyLearner(object):
 
         # Seed for charts
         if seed:
-            np.random.seed(903430342)
+            np.random.seed(2342)
 
     def author(self):
         return "nwatt3"
@@ -131,6 +131,7 @@ class StrategyLearner(object):
         discretized_indicators["boll_bandr"] = boll_bandr_ind.values
         discretized_indicators["simple_moving_averager"] = simple_moving_averager_ind.values
         discretized_indicators["mapping"] = stdev_divergence_ind.astype(str) + boll_bandr_ind.astype(str) + simple_moving_averager_ind.astype(str)
+        #discretized_indicators["mapping"] = stdev_divergence_ind.astype(str) + boll_bandr_ind.astype(str) #+ simple_moving_averager_ind.astype(str)
         discretized_indicators["state"] = discretized_indicators["mapping"].astype(np.int)
         states = discretized_indicators["state"]
 
@@ -226,7 +227,8 @@ class StrategyLearner(object):
         discretized_indicators["stdev_divergence"] = stdev_divergence_ind.values
         discretized_indicators["boll_bandr"] = boll_bandr_ind.values
         discretized_indicators["simple_moving_averager"] = simple_moving_averager_ind.values
-        discretized_indicators["mapping"] = stdev_divergence_ind.astype(str) + boll_bandr_ind.astype(str) + simple_moving_averager_ind.astype(str)
+        discretized_indicators["mapping"] =  stdev_divergence_ind.astype(str) + boll_bandr_ind.astype(str) + simple_moving_averager_ind.astype(str)
+       # discretized_indicators["mapping"] = stdev_divergence_ind.astype(str) + boll_bandr_ind.astype(str) + simple_moving_averager_ind.astype(str)
         discretized_indicators["state"] = discretized_indicators["mapping"].astype(np.int)
         states = discretized_indicators["state"]
 

@@ -39,7 +39,7 @@ def average_daily_ret(port_val):
 #indicators (SMA, standard dev, bollinger band)
 
 
-def get_stdev(prices, window=20, window_mean=40):
+def get_stdev(prices, window=20, window_mean=50):
     stdev=prices.rolling(window=window, min_periods=window).std()
     sd_signal=prices.rolling(window=window_mean, min_periods=window_mean).std()
     stdev_divergence=stdev - sd_signal
@@ -54,11 +54,11 @@ def get_daily_returns(prices):
 
 
 
-def get_simple_moving_average(prices, window=20):
+def get_simple_moving_average(prices, window=30):
     return prices.rolling(window=window, min_periods=window).mean()
 
 
-def get_simple_moving_average_ratio(prices, window=20):
+def get_simple_moving_average_ratio(prices, window=30):
     return prices / prices.rolling(window=window, min_periods=window).mean()
 
 
