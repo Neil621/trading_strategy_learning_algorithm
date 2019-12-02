@@ -422,7 +422,7 @@ def tests():
     time_testPolicy = time.time() - start
 
     if time_testPolicy >= time_addEvidence:
-        print("testPolicy() is not faster than addEvidence()!!! {} VS {}".format(time_testPolicy, time_addEvidence))
+        print("testPolicy() is not faster than addEvidence() {} VS {}".format(time_testPolicy, time_addEvidence))
     print("OK: testPolicy() faster than addEvidence(): {} VS {}".format(time_testPolicy, time_addEvidence))
 
 
