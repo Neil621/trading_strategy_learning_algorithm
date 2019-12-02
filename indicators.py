@@ -54,11 +54,11 @@ def get_daily_returns(prices):
 
 
 
-def get_simple_moving_average(prices, window=30):
+def get_simple_moving_average(prices, window=20):
     return prices.rolling(window=window, min_periods=window).mean()
 
 
-def get_simple_moving_average_ratio(prices, window=30):
+def get_simple_moving_average_ratio(prices, window=20):
     return prices / prices.rolling(window=window, min_periods=window).mean()
 
 
