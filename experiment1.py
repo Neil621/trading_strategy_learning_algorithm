@@ -53,7 +53,7 @@ def run_experiment():
     plt.ylabel("Normalized value")
     plt.grid()
     plt.tight_layout()
-    plt.savefig("figures/experiment1_{}_in_sample.png".format(symbol))
+    plt.savefig("experiment1_{}_in_sample.png".format(symbol))
 
 
 if __name__ == "__main__":

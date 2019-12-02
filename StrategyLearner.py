@@ -46,10 +46,12 @@ import QLearner as ql
 
 class StrategyLearner(object):
 
-    def __init__(self, verbose=False, seed=False, impact=0.0, commission=0.0, min_iter=20, max_iter=100):
+    def __init__(self, verbose=False, seed=False, impact=0.0, commission=0.0, min_iter=100, max_iter=400):
         self.verbose = verbose
         self.impact = impact
         self.commission = commission
+        #self.n_bins = 10
+        #python StrategyLearner.py
         self.n_bins = 10
         self.num_states = self.n_bins ** 3
         self.mean = None
@@ -64,6 +66,7 @@ class StrategyLearner(object):
         # Seed for charts
         if seed:
             np.random.seed(2342)
+            
 
     def author(self):
         return "nwatt3"
@@ -96,11 +99,12 @@ class StrategyLearner(object):
 
         # Indicators
         indicators = get_indicators(prices.to_frame(symbol))
-        self.mean = indicators.mean()
-        self.std = indicators.std()
-        if (self.std == 0).any():
-            self.std = 1
-        std_indicators = self.normalize_indicators(indicators, self.mean, self.std)
+        #self.mean = indicators.mean()
+        #self.std = indicators.std()
+        #if (self.std == 0).any():
+         #   self.std = 1
+        
+        #std_indicators = self.normalize_indicators(indicators, self.mean, self.std)
         #stdev_divergence = std_indicators["stdev_divergence"]
         #boll_bandr = std_indicators["boll_bandr"]
         #simple_moving_averager = std_indicators["simple_moving_averager"]
@@ -140,6 +144,8 @@ class StrategyLearner(object):
             num_states=self.num_states,
             num_actions=3,
             alpha=0.2,
+            #alpha=0.2,
+            
             gamma=0.9,
             rar=0.5,
             radr=0.99,
@@ -206,7 +212,7 @@ class StrategyLearner(object):
         #boll_bandr = std_indicators["boll_bandr"]
         #simple_moving_averager = std_indicators["simple_moving_averager"]
         
-        std_indicators = self.normalize_indicators(indicators, self.mean, self.std)
+        #std_indicators = self.normalize_indicators(indicators, self.mean, self.std)
         stdev_divergence = indicators["stdev_divergence"]
         boll_bandr = indicators["boll_bandr"]
         simple_moving_averager = indicators["simple_moving_averager"]
