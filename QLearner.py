@@ -64,14 +64,11 @@ class QLearner(object):
             rand.seed(903430342)
 
     def author(self):
-        return "smarchienne3"
+        return "nwatt3"
 
     def querysetstate(self, s, random=True):
-        """
-        @summary: Update the state without updating the Q-table 			  		 			     			  	   		   	  			  	
-        @param s: The new state
-        @returns: The selected action
-        """
+       
+    
         # Decide which action to take
         action = self.Q[s, :].argmax()
         if random and rand.uniform(0.0, 1.0) <= self.rar:
@@ -98,7 +95,7 @@ class QLearner(object):
             self.T[self.s, self.a, :] = self.Tc[self.s, self.a, :] / self.Tc[self.s, self.a, :].sum()
             self.R[self.s, self.a] = (1 - self.alpha) * self.R[self.s, self.a] + self.alpha * r
 
-            # Hallucinate
+            
             dyna_s = np.random.randint(0, self.num_states, size=self.dyna)
             dyna_a = np.random.randint(0, self.num_actions, size=self.dyna)
             dyna_s_prime = self.T[dyna_s, dyna_a, :].argmax(axis=1)
