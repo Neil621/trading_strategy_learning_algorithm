@@ -146,9 +146,10 @@ class StrategyLearner(object):
             alpha=0.2,
             #alpha=0.2,
             
+            #gamma=0.9,
             gamma=0.9,
             rar=0.5,
-            radr=0.99,
+            radr=0.75,
             dyna=0,
             verbose=self.verbose,
             seed=self.seed
